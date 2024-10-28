@@ -1,0 +1,138 @@
+{%- set name = "1-experiment-caltech101-lenet" -%}
+{%- set image = "truemanlife/k8s-experiment:v34" -%}
+{%- set num_worker = 11 -%}
+{%- set num_ps = 1 -%}
+{%- set ps_cpu = "1" -%}
+{%- set ps_mem = "5Gi" -%}
+{%- set worker_cpu = "2" -%}
+{%- set worker_mem = "5Gi" -%}
+{%- set worker_gpu = "2" -%}
+{%- set replicas = {"worker": num_worker, "ps": num_ps} -%}
+{%- set ps_placement = "pjl-master".split(",") -%}
+{%- set worker_placement = "pjl-master,pjl-master,pjl-master,pjl-master,wxy-node2,wxy-node2,wxy-node2,wxy-node2,zrl-node3,zrl-node3,zrl-node3".split(",") -%}
+{%- set ps_mount_dirs = "/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-ps-0/".split(",") -%}
+{%- set worker_mount_dirs = "/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-0/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-1/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-2/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-3/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-4/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-5/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-6/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-7/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-8/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-9/,/data/k8s-workdir/experiment/1-experiment-caltech101-lenet-worker-10/".split(",") -%}
+{%- set batch_sizes = "8,8,8,8,8,8,8,8,8,8,8".split(",") -%}
+{%- set work_volume = "k8s-mxnet-work-volume" -%}
+{%- set work_dir = "/mxnet/example/image-classification/data/" -%}
+{%- set data_dir = "/data/" -%}
+{%- set host_data_dir = "/data/mxnet-data/caltech101/lenet/" -%}
+{%- set data_volume = "k8s-mxnet-data-volume" -%}
+
+
+{%- macro worker_hosts() -%}
+  {%- for i in range(num_worker) -%}
+    {%- if not loop.first -%},{%- endif -%}
+    {{ name }}-worker-{{ i }}
+  {%- endfor -%}
+{%- endmacro -%}
+
+{%- macro ps_hosts() -%}
+  {%- for i in range(num_ps) -%}
+    {%- if not loop.first -%},{%- endif -%}
+    {{ name }}-ps-{{ i }}
+  {%- endfor -%}
+{%- endmacro -%}
+
+{%- for job in ["worker", "ps"] -%}
+{%- for i in range(replicas[job]) -%}
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: {{ name }}-{{ job }}-{{ i }}
+spec:
+  template:
+    metadata:
+      labels:
+        name: {{ name }}
+        job: {{ job }}
+        task: "{{ i }}"
+    spec:
+      nodeSelector:
+{%- if job == "worker" %}
+        kubernetes.io/hostname: {{ worker_placement[i] }}
+{%- else %}
+        kubernetes.io/hostname: {{ ps_placement[i] }}
+{%- endif %}
+      containers:
+      - name: {{ name }}
+        image: {{ image }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash"]
+        args: ["/init.sh"]
+        env:
+        - name: JOB_NAME
+          value: "{{ name }}"
+        - name: DMLC_NUM_WORKER
+          value: "{{ num_worker }}"
+        - name: DMLC_NUM_SERVER
+          value: "{{ num_ps }}"
+        - name: ROLE
+          value: "{{ job }}"
+        - name: PROG
+          value: "python train_imagenet.py --network lenet --model-prefix /data/ --disp-batches 20 --num-epochs 20 --data-train /data/caltech101_train.rec --gpus 0,1"
+        - name: WORK_DIR
+          value: "{{ work_dir }}"
+        - name: DATA_DIR
+          value: "{{ data_dir }}"
+        - name: KV_STORE
+          value: "dist_sync"
+        - name: BATCH_SIZE
+          value: "{{ batch_sizes[i] }}"
+        - name: MXNET_KVSTORE_BIGARRAY_BOUND
+          value: "1000000"
+        - name: PS_VERBOSE
+          value: ""
+        resources:
+          limits:
+{%- if job == "worker" %}
+            cpu: {{ worker_cpu }}
+            memory: {{ worker_mem }}
+            nvidia.com/gpu: {{ worker_gpu }}
+{%- else %}
+            cpu: {{ ps_cpu }}
+            memory: {{ ps_mem }}
+{%- endif %}
+          requests:
+{%- if job == "worker" %}
+            cpu: {{ worker_cpu }}
+            memory: {{ worker_mem }}
+            nvidia.com/gpu: {{ worker_gpu }}
+{%- else %}
+            cpu: {{ ps_cpu }}
+            memory: {{ ps_mem }}
+{%- endif %}
+        ports:
+        - containerPort: 6006
+        volumeMounts:
+        - mountPath: {{ work_dir }}
+          name: {{ work_volume }}
+        - mountPath: {{ data_dir }}
+          name: {{ data_volume }}
+        - mountPath: /usr/local/nvidia/lib
+          name: "nvidia-lib"
+        - mountPath: /usr/local/nvidia/lib64
+          name: "nvidia-lib64"
+      volumes:
+      - name: {{ work_volume }}
+        hostPath:
+{%- if job == "worker" %}
+          path: {{ worker_mount_dirs[i] }}
+{%- else %}
+          path: {{ ps_mount_dirs[i] }}
+{%- endif %}
+      - name: {{ data_volume }}
+        hostPath:
+          path: {{ host_data_dir }}
+      - name: "nvidia-lib"
+        hostPath:
+          path: /usr/lib/nvidia/
+      - name: "nvidia-lib64"
+        hostPath:
+          path: /usr/lib/x86_64-linux-gnu/
+
+      restartPolicy: Never
+---
+{% endfor %}
+{%- endfor -%}
+

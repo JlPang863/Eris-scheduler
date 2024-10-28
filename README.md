@@ -1,6 +1,6 @@
-# Optimus
+# Eris
 
-Optimus is a customized cluster scheduler for deep learning training jobs that targets high job performance and resource efficiency in production clusters. It builds resource-performance models for each job on the go, and dynamically schedules resources to jobs based on job progress and the cluster load to maximize training performance and resource efficiency. The implementation uses MXNet as the distributed training framework and schedules jobs based on Kubernetes.
+Eris is a customized cluster scheduler for deep learning training jobs that targets high job performance and resource efficiency in production clusters. It builds resource-performance models for each job on the go, and dynamically schedules resources to jobs based on job progress and the cluster load to maximize training performance and resource efficiency. The implementation uses MXNet as the distributed training framework and schedules jobs based on Kubernetes.
 
 ## Setup
 

@@ -29,4 +29,4 @@ The PS load balance algorithm and code are in [mxnet](mxnet/). The scheduling co
 Before running [experimentor.py](scheduler/experimentor.py), make sure hyper-parameters in [params.py](scheduler/params.py) are correct.
 
 ## More
-Read the <a href="https://dl.acm.org/citation.cfm?id=3190517"> Optimus paper </a>  and <a href="https://blog.acolyer.org/2018/06/12/optimus-an-efficient-dynamic-resource-scheduler-for-deep-learning-clusters/">the morning report </a> for details.
+Read the <a href="https://ieeexplore.ieee.org/abstract/document/10334489"> Eris paper </a>  and <a href="https://dl.acm.org/citation.cfm?id=3190517"> the code base paper </a> for details.
